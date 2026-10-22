@@ -4,7 +4,7 @@ pipeline {
 
     environment {
         DOCKER_IMAGE = 'jaykaswa16/task-manager'
-        DOCKER_CREDENTIALS = 'dockerhub-creds'
+        DOCKER_CREDENTIALS = 'dockerhub-creds-new'
         DOCKER_EXE = 'C:\\Users\\Admin\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin\\docker.exe'
     }
 
@@ -36,11 +36,13 @@ pipeline {
 
         stage('Login to Docker Hub') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub-creds',
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_TOKEN'
-                )]) {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-creds-new',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_TOKEN'
+                    )
+                ]) {
                     bat 'echo %DOCKER_TOKEN% | "%DOCKER_EXE%" login -u %DOCKER_USER% --password-stdin'
                 }
             }
