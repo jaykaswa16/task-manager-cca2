@@ -11,7 +11,7 @@ pipeline {
 
         stage('Docker Connection Test') {
             steps {
-                bat 'docker info'
+                bat '"C:\\Users\\Admin\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin\\docker.exe" info'
             }
         }
     }
