@@ -3,9 +3,15 @@ pipeline {
     agent any
 
     stages {
-        stage('Checkout Test') {
+        stage('GitHub Checkout') {
             steps {
-                echo 'GitHub repository connected successfully!'
+                echo 'GitHub checkout successful!'
+            }
+        }
+
+        stage('Docker Connection Test') {
+            steps {
+                bat 'docker info'
             }
         }
     }
