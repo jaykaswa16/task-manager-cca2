@@ -1,9 +1,9 @@
+
 pipeline {
     agent any
 
     environment {
         DOCKER_IMAGE = 'jaykaswa16/task-manager'
-        DOCKER_CREDENTIALS = 'dockerhub-creds-final'
         DOCKER_EXE = 'C:\\Users\\Admin\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin\\docker.exe'
     }
 
@@ -43,19 +43,18 @@ pipeline {
                     )
                 ]) {
                     powershell '''
-         if ([string]::IsNullOrWhiteSpace($env:DOCKER_USER)) {
-    Write-Host "DIAGNOSTIC: Docker username is empty"
-    exit 1
-}
+                        $ErrorActionPreference = "Stop"
 
-if ([string]::IsNullOrWhiteSpace($env:DOCKER_TOKEN)) {
-    Write-Host "DIAGNOSTIC: Docker token is empty"
-    exit 1
-}
+                        $token = $env:DOCKER_TOKEN.Trim()
 
-Write-Host "DIAGNOSTIC: Username is present"
-Write-Host "DIAGNOSTIC: Token is present"
-Write-Host "DIAGNOSTIC: Token length is $($env:DOCKER_TOKEN.Length)"
+                        $token | & $env:DOCKER_EXE login `
+                            --username $env:DOCKER_USER `
+                            --password-stdin
+
+                        if ($LASTEXITCODE -ne 0) {
+                            exit $LASTEXITCODE
+                        }
+                    '''
                 }
             }
         }
@@ -75,10 +74,6 @@ Write-Host "DIAGNOSTIC: Token length is $($env:DOCKER_TOKEN.Length)"
 
         failure {
             echo 'Pipeline failed. Check Console Output for details.'
-        }
-
-        always {
-            bat '"%DOCKER_EXE%" logout || exit /b 0'
         }
     }
 }
