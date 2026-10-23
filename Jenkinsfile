@@ -43,17 +43,19 @@ pipeline {
                     )
                 ]) {
                     powershell '''
-                        $ErrorActionPreference = "Stop"
+         if ([string]::IsNullOrWhiteSpace($env:DOCKER_USER)) {
+    Write-Host "DIAGNOSTIC: Docker username is empty"
+    exit 1
+}
 
-                        $env:DOCKER_TOKEN |
-                            & $env:DOCKER_EXE login `
-                                -u $env:DOCKER_USER `
-                                --password-stdin
+if ([string]::IsNullOrWhiteSpace($env:DOCKER_TOKEN)) {
+    Write-Host "DIAGNOSTIC: Docker token is empty"
+    exit 1
+}
 
-                        if ($LASTEXITCODE -ne 0) {
-                            exit $LASTEXITCODE
-                        }
-                    '''
+Write-Host "DIAGNOSTIC: Username is present"
+Write-Host "DIAGNOSTIC: Token is present"
+Write-Host "DIAGNOSTIC: Token length is $($env:DOCKER_TOKEN.Length)"
                 }
             }
         }
