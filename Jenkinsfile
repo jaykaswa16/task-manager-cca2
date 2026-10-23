@@ -28,12 +28,11 @@ pipeline {
 
         stage('Test Application') {
             steps {
-                bat 'python --version'
                 bat '"%DOCKER_EXE%" image inspect %DOCKER_IMAGE%:latest'
             }
         }
 
-        stage('Login to Docker Hub') {
+        stage('Check Docker Hub Credentials') {
             steps {
                 withCredentials([
                     usernamePassword(
@@ -45,35 +44,34 @@ pipeline {
                     powershell '''
                         $ErrorActionPreference = "Stop"
 
-                        $token = $env:DOCKER_TOKEN.Trim()
+                        Write-Output "=== CREDENTIAL DIAGNOSTIC ==="
 
-                        $token | & $env:DOCKER_EXE login `
-                            --username $env:DOCKER_USER `
-                            --password-stdin
-
-                        if ($LASTEXITCODE -ne 0) {
-                            exit $LASTEXITCODE
+                        if ([string]::IsNullOrWhiteSpace($env:DOCKER_USER)) {
+                            throw "Username was not received by Jenkins."
                         }
+
+                        Write-Output "Username received: $env:DOCKER_USER"
+
+                        if ([string]::IsNullOrWhiteSpace($env:DOCKER_TOKEN)) {
+                            throw "Token was not received by Jenkins."
+                        }
+
+                        Write-Output "Token received: YES"
+                        Write-Output "Token length: $($env:DOCKER_TOKEN.Trim().Length)"
+                        Write-Output "Diagnostic complete. No login attempted."
                     '''
                 }
-            }
-        }
-
-        stage('Push Docker Image') {
-            steps {
-                bat '"%DOCKER_EXE%" push %DOCKER_IMAGE%:%BUILD_NUMBER%'
-                bat '"%DOCKER_EXE%" push %DOCKER_IMAGE%:latest'
             }
         }
     }
 
     post {
         success {
-            echo 'CI/CD pipeline completed successfully!'
+            echo 'Build and credential diagnostic completed successfully!'
         }
 
         failure {
-            echo 'Pipeline failed. Check Console Output for details.'
+            echo 'Pipeline failed. Check Console Output.'
         }
     }
 }
