@@ -8,15 +8,25 @@ pipeline {
     }
 
     stages {
-        stage('Build and Test Image') {
+        stage('Checkout') {
             steps {
-                bat '"%DOCKER_EXE%" info'
-                bat '"%DOCKER_EXE%" build -t %DOCKER_IMAGE%:latest .'
+                echo 'Source code checked out successfully.'
+            }
+        }
+
+        stage('Build Image') {
+            steps {
+                bat '"%DOCKER_EXE%" build -t %DOCKER_IMAGE%:%BUILD_NUMBER% -t %DOCKER_IMAGE%:latest .'
+            }
+        }
+
+        stage('Test Image') {
+            steps {
                 bat '"%DOCKER_EXE%" image inspect %DOCKER_IMAGE%:latest'
             }
         }
 
-        stage('Compare Token Fingerprint') {
+        stage('Login to Docker Hub') {
             steps {
                 withCredentials([
                     usernamePassword(
@@ -27,22 +37,44 @@ pipeline {
                 ]) {
                     powershell '''
                         $ErrorActionPreference = "Stop"
-                        $token = $env:DOCKER_TOKEN.Trim()
-                        $sha = [Security.Cryptography.SHA256]::Create()
-                        $bytes = [Text.Encoding]::UTF8.GetBytes($token)
-                        $hashBytes = $sha.ComputeHash($bytes)
-                        $hash = [BitConverter]::ToString($hashBytes).Replace("-", "")
+                        $configDir = Join-Path $env:WORKSPACE "docker-auth-temp"
 
-                        Write-Output "Username: $env:DOCKER_USER"
-                        Write-Output "Jenkins token fingerprint: $hash"
+                        New-Item -ItemType Directory -Force -Path $configDir | Out-Null
+                        $env:DOCKER_CONFIG = $configDir
 
-                        $sha.Dispose()
-                        $token = $null
-                        $bytes = $null
-                        $hashBytes = $null
+                        try {
+                            $env:DOCKER_TOKEN.Trim() |
+                                & $env:DOCKER_EXE login `
+                                    --username $env:DOCKER_USER `
+                                    --password-stdin
+
+                            if ($LASTEXITCODE -ne 0) {
+                                throw "Docker Hub authentication failed."
+                            }
+                        }
+                        finally {
+                            Remove-Item Env:DOCKER_CONFIG -ErrorAction SilentlyContinue
+                            Remove-Item -LiteralPath $configDir -Recurse -Force -ErrorAction SilentlyContinue
+                        }
                     '''
                 }
             }
+        }
+
+        stage('Push Image') {
+            steps {
+                bat '"%DOCKER_EXE%" push %DOCKER_IMAGE%:%BUILD_NUMBER%'
+                bat '"%DOCKER_EXE%" push %DOCKER_IMAGE%:latest'
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'SUCCESS: Docker image built and pushed.'
+        }
+        failure {
+            echo 'Pipeline failed. Check the first error in Console Output.'
         }
     }
 }
