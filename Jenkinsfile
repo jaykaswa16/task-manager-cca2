@@ -8,9 +8,9 @@ pipeline {
     }
 
     stages {
-        stage('GitHub Checkout') {
+        stage('Checkout') {
             steps {
-                echo 'Source code checked out successfully!'
+                echo 'Source code checked out successfully.'
             }
         }
 
@@ -26,13 +26,13 @@ pipeline {
             }
         }
 
-        stage('Test Application') {
+        stage('Test Docker Image') {
             steps {
                 bat '"%DOCKER_EXE%" image inspect %DOCKER_IMAGE%:latest'
             }
         }
 
-        stage('Check Docker Hub Credentials') {
+        stage('Login to Docker Hub') {
             steps {
                 withCredentials([
                     usernamePassword(
@@ -43,35 +43,38 @@ pipeline {
                 ]) {
                     powershell '''
                         $ErrorActionPreference = "Stop"
+                        $token = $env:DOCKER_TOKEN.Trim()
 
-                        Write-Output "=== CREDENTIAL DIAGNOSTIC ==="
-
-                        if ([string]::IsNullOrWhiteSpace($env:DOCKER_USER)) {
-                            throw "Username was not received by Jenkins."
+                        if ([string]::IsNullOrWhiteSpace($token)) {
+                            throw "Docker Hub token is empty."
                         }
 
-                        Write-Output "Username received: $env:DOCKER_USER"
+                        $token | & $env:DOCKER_EXE login `
+                            --username $env:DOCKER_USER `
+                            --password-stdin
 
-                        if ([string]::IsNullOrWhiteSpace($env:DOCKER_TOKEN)) {
-                            throw "Token was not received by Jenkins."
+                        if ($LASTEXITCODE -ne 0) {
+                            throw "Docker Hub login failed."
                         }
-
-                        Write-Output "Token received: YES"
-                        Write-Output "Token length: $($env:DOCKER_TOKEN.Trim().Length)"
-                        Write-Output "Diagnostic complete. No login attempted."
                     '''
                 }
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                bat '"%DOCKER_EXE%" push %DOCKER_IMAGE%:%BUILD_NUMBER%'
+                bat '"%DOCKER_EXE%" push %DOCKER_IMAGE%:latest'
             }
         }
     }
 
     post {
         success {
-            echo 'Build and credential diagnostic completed successfully!'
+            echo 'SUCCESS: Image built and pushed to Docker Hub.'
         }
-
         failure {
-            echo 'Pipeline failed. Check Console Output.'
+            echo 'Pipeline failed. Check the first error in Console Output.'
         }
     }
 }
