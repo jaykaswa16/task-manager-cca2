@@ -8,31 +8,15 @@ pipeline {
     }
 
     stages {
-        stage('Checkout') {
-            steps {
-                echo 'Source code checked out successfully.'
-            }
-        }
-
-        stage('Docker Connection Test') {
+        stage('Build and Test Image') {
             steps {
                 bat '"%DOCKER_EXE%" info'
-            }
-        }
-
-        stage('Build Docker Image') {
-            steps {
-                bat '"%DOCKER_EXE%" build -t %DOCKER_IMAGE%:%BUILD_NUMBER% -t %DOCKER_IMAGE%:latest .'
-            }
-        }
-
-        stage('Test Docker Image') {
-            steps {
+                bat '"%DOCKER_EXE%" build -t %DOCKER_IMAGE%:latest .'
                 bat '"%DOCKER_EXE%" image inspect %DOCKER_IMAGE%:latest'
             }
         }
 
-        stage('Login to Docker Hub') {
+        stage('Compare Token Fingerprint') {
             steps {
                 withCredentials([
                     usernamePassword(
@@ -44,37 +28,21 @@ pipeline {
                     powershell '''
                         $ErrorActionPreference = "Stop"
                         $token = $env:DOCKER_TOKEN.Trim()
+                        $sha = [Security.Cryptography.SHA256]::Create()
+                        $bytes = [Text.Encoding]::UTF8.GetBytes($token)
+                        $hashBytes = $sha.ComputeHash($bytes)
+                        $hash = [BitConverter]::ToString($hashBytes).Replace("-", "")
 
-                        if ([string]::IsNullOrWhiteSpace($token)) {
-                            throw "Docker Hub token is empty."
-                        }
+                        Write-Output "Username: $env:DOCKER_USER"
+                        Write-Output "Jenkins token fingerprint: $hash"
 
-                        $token | & $env:DOCKER_EXE login `
-                            --username $env:DOCKER_USER `
-                            --password-stdin
-
-                        if ($LASTEXITCODE -ne 0) {
-                            throw "Docker Hub login failed."
-                        }
+                        $sha.Dispose()
+                        $token = $null
+                        $bytes = $null
+                        $hashBytes = $null
                     '''
                 }
             }
-        }
-
-        stage('Push Docker Image') {
-            steps {
-                bat '"%DOCKER_EXE%" push %DOCKER_IMAGE%:%BUILD_NUMBER%'
-                bat '"%DOCKER_EXE%" push %DOCKER_IMAGE%:latest'
-            }
-        }
-    }
-
-    post {
-        success {
-            echo 'SUCCESS: Image built and pushed to Docker Hub.'
-        }
-        failure {
-            echo 'Pipeline failed. Check the first error in Console Output.'
         }
     }
 }
