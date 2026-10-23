@@ -43,7 +43,16 @@ pipeline {
                         passwordVariable: 'DOCKER_TOKEN'
                     )
                 ]) {
-                    bat 'echo %DOCKER_TOKEN% | "%DOCKER_EXE%" login -u %DOCKER_USER% --password-stdin'
+                    powershell '''
+                        $ErrorActionPreference = "Stop"
+
+                        $env:DOCKER_TOKEN | & $env:DOCKER_EXE login `
+                            -u $env:DOCKER_USER --password-stdin
+
+                        if ($LASTEXITCODE -ne 0) {
+                            exit $LASTEXITCODE
+                        }
+                    '''
                 }
             }
         }
@@ -60,9 +69,11 @@ pipeline {
         success {
             echo 'CI/CD pipeline completed successfully!'
         }
+
         failure {
             echo 'Pipeline failed. Check Console Output for details.'
         }
+
         always {
             bat '"%DOCKER_EXE%" logout || exit /b 0'
         }
