@@ -1,10 +1,9 @@
-
 pipeline {
     agent any
 
     environment {
         DOCKER_IMAGE = 'jaykaswa16/task-manager'
-        DOCKER_CREDENTIALS = 'dockerhub-creds-new'
+        DOCKER_CREDENTIALS = 'dockerhub-creds-final'
         DOCKER_EXE = 'C:\\Users\\Admin\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin\\docker.exe'
     }
 
@@ -38,7 +37,7 @@ pipeline {
             steps {
                 withCredentials([
                     usernamePassword(
-                        credentialsId: 'dockerhub-creds-new',
+                        credentialsId: 'dockerhub-creds-final',
                         usernameVariable: 'DOCKER_USER',
                         passwordVariable: 'DOCKER_TOKEN'
                     )
@@ -46,8 +45,10 @@ pipeline {
                     powershell '''
                         $ErrorActionPreference = "Stop"
 
-                        $env:DOCKER_TOKEN | & $env:DOCKER_EXE login `
-                            -u $env:DOCKER_USER --password-stdin
+                        $env:DOCKER_TOKEN |
+                            & $env:DOCKER_EXE login `
+                                -u $env:DOCKER_USER `
+                                --password-stdin
 
                         if ($LASTEXITCODE -ne 0) {
                             exit $LASTEXITCODE
